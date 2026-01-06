@@ -1,0 +1,11 @@
+[package]
+name = "dynarray"
+version = "0.1.0"
+edition = "2024"
+
+license = "WTFPL"
+authors = ["ogghostjelly"]
+description = "the worst alloca you've ever seen."
+
+[profile.release]
+debug = 2
