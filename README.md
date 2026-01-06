@@ -1,6 +1,6 @@
 # alloca shenanigans
 
-an on-going experiment... prepare your eyes... for the worst `alloca` implementation you've ever seen...
+an on-going experiment... prepare your eyes... for the worst `alloca` implementation you've ever seen... only works on x86-64
 
 rust really does not want you messing with the stack pointer
 

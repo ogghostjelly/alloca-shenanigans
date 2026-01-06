@@ -29,7 +29,7 @@ pub unsafe fn alloca(size: usize, f: fn(*mut c_void)) {
     /*
     rbp = rsp
     rsp -= floor16(16 + 8 + size - 1);
-    f(floor16(rsp + 15));
+    f(rsp);
     rsp = rbp;
     */
 
@@ -50,13 +50,9 @@ pub unsafe fn alloca(size: usize, f: fn(*mut c_void)) {
             "and rdi, 0xfffffffffffffff0",
 
             // rsp -= rdi
-            // rdi = rsp + 15
+            // rdi = rsp (rdi will be the first parameter for the following function call)
             "sub rsp, rdi",
             "mov rdi, rsp",
-            "add rdi, 15",
-
-            // round rdi to 16 again
-            "and rdi, 0xfffffffffffffff0",
 
             // call the function
             "call {f}",
