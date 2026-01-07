@@ -1,5 +1,9 @@
 #![no_main]
-use std::{ffi::c_void, slice};
+use std::{
+    ffi::c_void,
+    mem::{ManuallyDrop, MaybeUninit},
+    slice,
+};
 
 #[unsafe(no_mangle)]
 pub fn main() {
@@ -27,13 +31,32 @@ pub fn main() {
 ///
 /// # Safety
 /// For the love of god don't stack overflow.
-pub unsafe fn alloca(size: usize, f: fn(*mut c_void)) {
+pub unsafe fn alloca(size: usize, f: impl FnOnce(*mut c_void)) {
+    let closure = f;
+    let f = get_trampoline(&closure);
+
+    let mut closure = MaybeUninit::new(closure);
+    let data = closure.as_mut_ptr() as *mut c_void;
+    unsafe { raw_alloca(size, data, f) };
+}
+
+// Thanks to the [alloca](https://docs.rs/alloca/latest/alloca/) rust crate for this closure->fn idea.
+fn get_trampoline<F: FnOnce(*mut c_void)>(_closure: &F) -> fn(*mut c_void, *mut c_void) {
+    trampoline::<F>
+}
+
+fn trampoline<F: FnOnce(*mut c_void)>(ptr: *mut c_void, data: *mut c_void) {
+    let f = unsafe { ManuallyDrop::take(&mut *(data as *mut ManuallyDrop<F>)) };
+    f(ptr)
+}
+
+unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_void)) {
     use std::arch::asm;
 
     /*
     rbp = rsp
     rsp -= floor16(16 + 8 + size - 1);
-    f(rsp);
+    f(rsp, data);
     rsp = rbp;
     */
 
@@ -58,7 +81,7 @@ pub unsafe fn alloca(size: usize, f: fn(*mut c_void)) {
             "sub rsp, rdi",
             "mov rdi, rsp",
 
-            // call the function
+            // call the function with rdi (ptr) and rsi (data)
             "call {f}",
 
             // restore stack using the base pointer (rbp)
@@ -67,6 +90,7 @@ pub unsafe fn alloca(size: usize, f: fn(*mut c_void)) {
             "pop rbp",
 
             in("rdi") size,
+            in("rsi") data,
             f = in(reg) f,
         )
     };
