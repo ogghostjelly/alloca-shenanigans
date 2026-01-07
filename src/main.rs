@@ -19,7 +19,11 @@ pub fn main() {
 }
 
 /// Allocate an amount of memory in bytes on the stack.
-/// The pointer to that memory is passed to the given function.
+/// A pointer to that allocated memory is passed to the given function.
+///
+/// The allocated memory is popped from the stack at the end of the function,
+/// but the contents of that memory is never `Drop`-ed.
+/// You will have to call drop manually.
 ///
 /// # Safety
 /// For the love of god don't stack overflow.
