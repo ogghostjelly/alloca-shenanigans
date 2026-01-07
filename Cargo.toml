@@ -3,7 +3,7 @@ name = "dynarray"
 version = "0.1.0"
 edition = "2024"
 
-license = "WTFPL"
+license = "GLWTPL"
 authors = ["ogghostjelly"]
 description = "the worst alloca you've ever seen."
 
