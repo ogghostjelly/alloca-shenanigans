@@ -62,34 +62,26 @@ unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_v
 
     unsafe {
         asm!(
-            // rbp is callee-saved (as opposed to caller-saved)
-            // meaning it will need to be restored later.
-            "push rbp",
-            // set the stack base pointer (rbp) to rsp
-            "mov rbp, rsp",
-
-            // rdi = size, because it was specified as an in(reg)
             // adding 15 makes the next operation round-up instead of round-down
-            "add rdi, 15",
+            "add r12, 15",
             // sets the last 4 bits to zero (effectively rounds-down to 16)
             // it needs to be rounded to 16 because stack alignment
-            "and rdi, 0xfffffffffffffff0",
+            "and r12, 0xfffffffffffffff0",
 
-            // rsp -= rdi
+            // rsp -= size
             // rdi = rsp (rdi will be the first parameter for the following function call)
-            "sub rsp, rdi",
+            "sub rsp, r12",
             "mov rdi, rsp",
 
             // call the function with rdi (ptr) and rsi (data)
             "call {f}",
 
-            // restore stack using the base pointer (rbp)
-            "mov rsp, rbp",
-            // restore registers
-            "pop rbp",
+            // restore stack
+            "add rsp, r12",
 
-            in("rdi") size,
+            out("rdi") _,
             in("rsi") data,
+            in("r12") size, // any callee-saved register will do
             f = in(reg) f,
         )
     };
