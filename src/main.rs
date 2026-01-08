@@ -55,7 +55,7 @@ unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_v
 
     /*
     rbp = rsp
-    rsp -= floor16(16 + 8 + size - 1);
+    rsp -= floor16((16 - 1) + size);
     f(rsp, data);
     rsp = rbp;
     */
@@ -69,9 +69,8 @@ unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_v
             "mov rbp, rsp",
 
             // rdi = size, because it was specified as an in(reg)
-            // 16 + 8 + size - 1
-            "add rdi, 23",
-
+            // adding 15 makes the next operation round-up instead of round-down
+            "add rdi, 15",
             // sets the last 4 bits to zero (effectively rounds-down to 16)
             // it needs to be rounded to 16 because stack alignment
             "and rdi, 0xfffffffffffffff0",
