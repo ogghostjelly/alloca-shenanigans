@@ -9,6 +9,8 @@ use std::{
 pub fn main() {
     // Look Ma! No heap!
     unsafe {
+        let mut ret = Some([4, 3, 2, 1]);
+
         alloca(4, |ptr| {
             let slice = slice::from_raw_parts_mut(ptr as *mut u8, 4);
 
@@ -17,8 +19,14 @@ pub fn main() {
             slice[2] = 3;
             slice[3] = 4;
 
-            println!("{slice:?}");
-        })
+            ret = Some({
+                let mut dst = [0; 4];
+                dst.copy_from_slice(slice);
+                dst
+            });
+        });
+
+        println!("{ret:?}");
     };
 }
 
@@ -31,26 +39,33 @@ pub fn main() {
 ///
 /// # Safety
 /// For the love of god don't stack overflow.
-pub unsafe fn alloca(size: usize, f: impl FnOnce(*mut c_void)) {
-    let closure = f;
+pub unsafe fn alloca(size: usize, closure: impl FnOnce(*mut MaybeUninit<u8>)) {
     let f = get_trampoline(&closure);
-
-    let mut closure = MaybeUninit::new(closure);
-    let data = closure.as_mut_ptr() as *mut c_void;
-    unsafe { raw_alloca(size, data, f) };
+    let mut closure = ManuallyDrop::new(closure);
+    let data = &raw mut closure as *mut c_void;
+    unsafe { raw_alloca(size, f, data) };
 }
 
 // Thanks to the [alloca](https://docs.rs/alloca/latest/alloca/) rust crate for this closure->fn idea.
-fn get_trampoline<F: FnOnce(*mut c_void)>(_closure: &F) -> fn(*mut c_void, *mut c_void) {
+fn get_trampoline<F: FnOnce(*mut MaybeUninit<u8>)>(
+    _closure: &F,
+) -> extern "C" fn(*mut MaybeUninit<u8>, *mut c_void) {
     trampoline::<F>
 }
 
-fn trampoline<F: FnOnce(*mut c_void)>(ptr: *mut c_void, data: *mut c_void) {
+extern "C" fn trampoline<F: FnOnce(*mut MaybeUninit<u8>)>(
+    ptr: *mut MaybeUninit<u8>,
+    data: *mut c_void,
+) {
     let f = unsafe { ManuallyDrop::take(&mut *(data as *mut ManuallyDrop<F>)) };
     f(ptr)
 }
 
-unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_void)) {
+unsafe fn raw_alloca(
+    size: usize,
+    f: extern "C" fn(*mut MaybeUninit<u8>, *mut c_void),
+    data: *mut c_void,
+) {
     use std::arch::asm;
 
     /*
@@ -83,6 +98,7 @@ unsafe fn raw_alloca(size: usize, data: *mut c_void, f: fn(*mut c_void, *mut c_v
             in("rsi") data,
             in("r12") size, // any callee-saved register will do
             f = in(reg) f,
+            clobber_abi("C"),
         )
     };
 }
