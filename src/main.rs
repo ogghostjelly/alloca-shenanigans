@@ -9,9 +9,7 @@ use std::{
 pub fn main() {
     // Look Ma! No heap!
     unsafe {
-        let mut ret = Some([4, 3, 2, 1]);
-
-        alloca(4, |ptr| {
+        let ret = alloca(4, |ptr| {
             let slice = slice::from_raw_parts_mut(ptr as *mut u8, 4);
 
             slice[0] = 1;
@@ -19,11 +17,11 @@ pub fn main() {
             slice[2] = 3;
             slice[3] = 4;
 
-            ret = Some({
+            Some({
                 let mut dst = [0; 4];
                 dst.copy_from_slice(slice);
                 dst
-            });
+            })
         });
 
         println!("{ret:?}");
@@ -39,11 +37,19 @@ pub fn main() {
 ///
 /// # Safety
 /// For the love of god don't stack overflow.
-pub unsafe fn alloca(size: usize, closure: impl FnOnce(*mut MaybeUninit<u8>)) {
+pub unsafe fn alloca<T>(size: usize, closure: impl FnOnce(*mut MaybeUninit<u8>) -> T) -> T {
+    let mut ret = MaybeUninit::uninit();
+    let closure = |ptr| _ = ret.write(closure(ptr));
+
     let f = get_trampoline(&closure);
+
     let mut closure = ManuallyDrop::new(closure);
     let data = &raw mut closure as *mut c_void;
-    unsafe { raw_alloca(size, f, data) };
+
+    unsafe {
+        raw_alloca(size, f, data);
+        ret.assume_init()
+    }
 }
 
 // Thanks to the [alloca](https://docs.rs/alloca/latest/alloca/) rust crate for this closure->fn idea.
