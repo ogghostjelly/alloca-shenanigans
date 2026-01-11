@@ -102,7 +102,7 @@ unsafe fn raw_alloca(
 
             out("rdi") _,
             in("rsi") data,
-            in("r12") size, // any callee-saved register will do
+            inout("r12") size => _, // any callee-saved register will do
             f = in(reg) f,
             clobber_abi("C"),
         )
