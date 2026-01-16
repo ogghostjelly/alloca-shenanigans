@@ -75,20 +75,13 @@ unsafe fn raw_alloca(
     use std::arch::asm;
 
     /*
-    rbp = rsp
-    rsp -= floor16((16 - 1) + size);
+    rsp -= size;
     f(rsp, data);
-    rsp = rbp;
+    rsp += size;
     */
 
     unsafe {
         asm!(
-            // adding 15 makes the next operation round-up instead of round-down
-            "add r12, 15",
-            // sets the last 4 bits to zero (effectively rounds-down to 16)
-            // it needs to be rounded to 16 because stack alignment
-            "and r12, 0xfffffffffffffff0",
-
             // rsp -= size
             // rdi = rsp (rdi will be the first parameter for the following function call)
             "sub rsp, r12",
